@@ -11,15 +11,21 @@ jobs:
     name: Build and test
     runs-on: ubuntu-latest
 
+    defaults:
+      run:
+        working-directory: black-vault-cli
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          path: black-vault-cli
 
       - name: Checkout black-vault-lib dependency
         uses: actions/checkout@v4
         with:
           repository: darknamer/black-vault-lib
-          path: ../black-vault-lib
+          path: black-vault-lib
 
       - name: Set up Go
         uses: actions/setup-go@v5
