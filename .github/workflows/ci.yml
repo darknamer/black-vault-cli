@@ -49,3 +49,32 @@ jobs:
       - name: Run tests
         run: go test ./...
 
+      - name: Create or update GitHub release v0.1.0
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          TAG="v0.1.0"
+          ASSET_PATH="blackvault"
+
+          if ! [ -f "$ASSET_PATH" ]; then
+            echo "Asset $ASSET_PATH not found"
+            exit 1
+          fi
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG exists, cleaning up old assets"
+            assets=$(gh release view "$TAG" --json assets --jq '.assets[].name')
+            for asset in $assets; do
+              gh release delete-asset "$TAG" "$asset" -y
+            done
+
+            echo "Uploading new asset"
+            gh release upload "$TAG" "$ASSET_PATH" --clobber
+          else
+            echo "Creating release $TAG"
+            gh release create "$TAG" "$ASSET_PATH" --title "$TAG" --notes "Release $TAG"
+          fi
+
