@@ -24,7 +24,7 @@ jobs:
       - name: Checkout black-vault-lib dependency
         uses: actions/checkout@v4
         with:
-          repository: darknamer/black-vault-lib.git
+          repository: darknamer/black-vault-lib
           ref: main
           path: black-vault-lib
 
