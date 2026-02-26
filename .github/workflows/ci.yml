@@ -24,7 +24,7 @@ jobs:
       - name: Checkout black-vault-lib dependency
         uses: actions/checkout@v4
         with:
-          repository: darknamer/black-vault-lib
+          repository: darkanmer/black-vault-lib
           path: black-vault-lib
 
       - name: Set up Go
