@@ -1,0 +1,73 @@
+syntax = "proto3";
+
+package blackvault.v1;
+
+option go_package = "github.com/darknamer/black-vault-cli/api/proto;blackvaultpb";
+
+// BlackVaultService - Core service for workspace lifecycle (used by CLI & GUI via gRPC).
+service BlackVaultService {
+  rpc OpenWorkspace(OpenWorkspaceRequest) returns (OpenWorkspaceResponse);
+  rpc CloseWorkspace(CloseWorkspaceRequest) returns (CloseWorkspaceResponse);
+  rpc GetStatus(GetStatusRequest) returns (GetStatusResponse);
+  rpc ListRepositories(ListRepositoriesRequest) returns (ListRepositoriesResponse);
+  rpc Ping(PingRequest) returns (PingResponse);
+}
+
+message OpenWorkspaceRequest {
+  string repo_path = 1;
+  bool shallow = 2;
+  string branch = 3;
+  bool detached = 4;
+}
+
+message OpenWorkspaceResponse {
+  string workspace_path = 1;
+  string error = 2;
+}
+
+message CloseWorkspaceRequest {
+  string repo_path = 1;
+  bool force = 2;
+}
+
+message CloseWorkspaceResponse {
+  bool ok = 1;
+  string error = 2;
+}
+
+message GetStatusRequest {}
+
+message WorkspaceStatus {
+  string repo_path = 1;
+  string state = 2;
+  string path = 3;
+  bool dirty = 4;
+}
+
+message GetStatusResponse {
+  repeated WorkspaceStatus workspaces = 1;
+  string error = 2;
+}
+
+message ListRepositoriesRequest {
+  string group_filter = 1;
+}
+
+message RepositoryInfo {
+  string id = 1;
+  string name = 2;
+  string group = 3;
+  string default_branch = 4;
+  string last_opened = 5;
+  string status = 6;
+}
+
+message ListRepositoriesResponse {
+  repeated RepositoryInfo repos = 1;
+  string error = 2;
+}
+
+message PingRequest {}
+message PingResponse {
+  string version = 1;
+}
