@@ -144,19 +144,20 @@ jobs:
       - name: Create or update GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
 
-          if gh release view "$TAG" >/dev/null 2>&1; then
+          if gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then
             echo "Release $TAG exists, cleaning up old assets"
-            assets=$(gh release view "$TAG" --json assets --jq '.assets[].name')
+            assets=$(gh release view "$TAG" -R "$REPO" --json assets --jq '.assets[].name')
             for asset in $assets; do
-              gh release delete-asset "$TAG" "$asset" -y
+              gh release delete-asset "$TAG" "$asset" -R "$REPO" -y
             done
 
             echo "Uploading new assets"
-            gh release upload "$TAG" release-binaries/* --clobber
+            gh release upload "$TAG" release-binaries/* -R "$REPO" --clobber
           else
             echo "Creating release $TAG"
-            gh release create "$TAG" release-binaries/* --title "$TAG" --notes "Release $TAG"
+            gh release create "$TAG" release-binaries/* -R "$REPO" --title "$TAG" --notes "Release $TAG"
           fi
