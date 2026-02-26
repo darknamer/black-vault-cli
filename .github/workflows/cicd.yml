@@ -1,0 +1,162 @@
+name: Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  GO_VERSION: "1.24.x"
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: black-vault-cli
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          path: black-vault-cli
+
+      - name: Checkout black-vault-lib dependency
+        uses: actions/checkout@v4
+        with:
+          repository: darknamer/black-vault-lib
+          token: ${{ secrets.GIT_TOKEN }}
+          ref: main
+          path: black-vault-lib
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('black-vault-cli/go.sum') }}
+          restore-keys: ${{ runner.os }}-go-
+
+      - name: Run tests
+        run: go test ./...
+
+  build:
+    name: Build ${{ matrix.goos }}/${{ matrix.goarch }}
+    runs-on: ${{ matrix.os }}
+    needs: [ test ]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+          - os: ubuntu-latest
+            goos: linux
+            goarch: arm64
+          - os: windows-latest
+            goos: windows
+            goarch: amd64
+          - os: windows-latest
+            goos: windows
+            goarch: arm64
+          - os: macos-latest
+            goos: darwin
+            goarch: amd64
+          - os: macos-latest
+            goos: darwin
+            goarch: arm64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          path: black-vault-cli
+
+      - name: Checkout black-vault-lib dependency
+        uses: actions/checkout@v4
+        with:
+          repository: darknamer/black-vault-lib
+          token: ${{ secrets.GIT_TOKEN }}
+          ref: main
+          path: black-vault-lib
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-${{ matrix.goos }}-${{ matrix.goarch }}-go-${{ hashFiles('black-vault-cli/go.sum') }}
+          restore-keys: ${{ runner.os }}-${{ matrix.goos }}-${{ matrix.goarch }}-go-
+
+      - name: Build
+        shell: bash
+        working-directory: black-vault-cli
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+          BINARY_NAME: blackvault-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.goos == 'windows' && '.exe' || '' }}
+        run: go build -o "$BINARY_NAME" .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: blackvault-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: black-vault-cli/blackvault-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.goos == 'windows' && '.exe' || '' }}
+
+  release:
+    name: Release v0.1.0
+    runs-on: ubuntu-latest
+    needs: [ build ]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    env:
+      TAG: "v0.1.0"
+
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: blackvault-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Flatten release binaries
+        run: |
+          mkdir -p release-binaries
+          find release-assets -type f -exec cp {} release-binaries/ \;
+          ls -la release-binaries/
+
+      - name: Create or update GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG exists, cleaning up old assets"
+            assets=$(gh release view "$TAG" --json assets --jq '.assets[].name')
+            for asset in $assets; do
+              gh release delete-asset "$TAG" "$asset" -y
+            done
+
+            echo "Uploading new assets"
+            gh release upload "$TAG" release-binaries/* --clobber
+          else
+            echo "Creating release $TAG"
+            gh release create "$TAG" release-binaries/* --title "$TAG" --notes "Release $TAG"
+          fi
