@@ -40,7 +40,7 @@ func runConfigGet(cmd *cobra.Command, args []string) error {
 		fmt.Printf("git_path (config): %q\n", svc.GetGitPath())
 		fmt.Printf("git_path (resolved): %q\n", resolved)
 		if resolved == "" {
-			fmt.Println("(ใช้ go-git แทน — ไม่พบ git ของระบบหรือ portable)")
+			fmt.Println("(Using go-git instead — system or portable git not found.)")
 		}
 		return nil
 	}
