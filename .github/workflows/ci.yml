@@ -25,6 +25,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: darknamer/black-vault-lib
+          token: ${{ secrets.BLACK_VAULT_LIB_PAT }}
           ref: main
           path: black-vault-lib
 
