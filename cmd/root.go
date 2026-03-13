@@ -10,6 +10,10 @@ var rootCmd = &cobra.Command{
 	Long:  "Ephemeral workspace manager for Git repos: open (clone), close (delete), status.",
 }
 
+func RootCmd() *cobra.Command {
+	return rootCmd
+}
+
 func Execute() error {
 	return rootCmd.Execute()
 }
