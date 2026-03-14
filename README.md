@@ -18,6 +18,7 @@ black-vault-cli/
 │   └── blackvault.proto   # สัญญา gRPC (ซิงค์กับ black-vault-lib)
 ├── cmd/
 │   ├── root.go
+│   ├── root_test.go      # เทสในแพ็กเกจ cmd สำหรับ coverage
 │   ├── open.go
 │   ├── close.go
 │   ├── status.go
@@ -31,6 +32,10 @@ black-vault-cli/
 │   ├── git_merge.go     # รวม branch (git merge)
 │   ├── git_remote.go    # จัดการ remote (list/add/remove/set-url)
 │   └── git_flow.go      # git-flow feature/release/hotfix
+├── test/
+│   ├── root_test.go     # metadata, subcommands, --help ของทุก command
+│   ├── cmd_args_test.go # ตรวจสอบ argument ของคำสั่งต่างๆ
+│   └── coverage_test.go # เทสสำหรับ coverage
 ├── main.go
 ├── go.mod                 # replace black-vault-lib => ../black-vault-lib
 ├── Makefile
@@ -80,107 +85,49 @@ go build -o blackvault .
 make build
 ```
 
-## การทดสอบ (Unit + Integration)
+## การทดสอบ (Unit + Coverage)
 
-### Unit tests (ทดสอบฟังก์ชัน/แพ็กเกจย่อย)
+### โครงสร้างเทส
 
-- **ไฟล์ทดสอบ:** สร้างไฟล์ `*_test.go` ในแพ็กเกจเดียวกับโค้ด เช่น:
-  - `cmd/root_test.go`
-  - `cmd/open_test.go`
-  - `cmd/close_test.go`
-  - ฯลฯ
-- **โครงสร้างเบื้องต้น:**
+- **`test/`** — เทสของ CLI (เรียกใช้ `cmd` จากภายนอก)
+  - `test/root_test.go` — metadata ของ root, รายการ subcommand, metadata ของทุก command, การรัน `--help` ของทุก command
+  - `test/cmd_args_test.go` — การตรวจสอบ argument (คำสั่งที่ต้องมี arg จะ error เมื่อไม่มี/ไม่ครบ)
+  - `test/coverage_test.go` — เทสสำหรับให้ coverage นับการเรียกใช้ `cmd`
+- **`cmd/root_test.go`** — เทสในแพ็กเกจ `cmd` เพื่อให้ `go test -cover ./cmd/...` รายงาน coverage ของ `cmd` (เช่น `RootCmd`, `Execute("--help")`)
 
-```go
-package cmd_test
-
-import (
-    "testing"
-
-    "github.com/darknamer/black-vault-cli/cmd"
-)
-
-func TestRootCmd_Execute(t *testing.T) {
-    // TODO: ตั้งค่า rootCmd ให้ใช้ output เป็น buffer แล้วเช็คข้อความ
-    // เช่น ทดสอบว่า `blackvault --help` แสดง usage ตามที่คาด
-}
-```
-
-- **รัน unit test ทั้งโปรเจกต์:**
+### รันเทส
 
 ```bash
+# รันเทสทั้งหมด
 go test ./...
+# หรือ
+make test
 ```
 
-### Integration tests (ทดสอบ CLI แบบ end-to-end)
+### Coverage (ความครอบคลุม)
 
-Integration test จะรัน binary จริงของ `blackvault` แล้วทดสอบพฤติกรรมรวม เช่น `open`, `close`, `status`, `serve` โดยใช้โฟลเดอร์ชั่วคราว (ไม่ไปยุ่งกับ `~/.blackvault` ของจริง)
-
-1. **สร้าง binary สำหรับทดสอบ:**
+| คำสั่ง | ความหมาย |
+|--------|-----------|
+| `make test-cover` | รันเทสพร้อมแสดงเปอร์เซ็นต์ coverage ต่อแพ็กเกจ |
+| `make test-cover-profile` | รันเทสและเขียน profile ลง `coverage.out` |
+| `make test-cover-html` | สร้าง `coverage.out` แล้วสร้างรายงาน HTML ที่ `coverage.html` (เปิดในเบราว์เซอร์ดูแบบบรรทัดต่อบรรทัด) |
 
 ```bash
-go build -o ./bin/blackvault .
+# แสดง coverage แบบสรุป
+make test-cover
+
+# สร้างไฟล์ profile (coverage.out) และรายงาน HTML (coverage.html)
+make test-cover-html
 ```
 
-2. **สร้างโฟลเดอร์ integration test** (เช่น `integration/cli_integration_test.go`) และใช้ `exec.Command` รันคำสั่ง:
-
-```go
-package integration
-
-import (
-    "bytes"
-    "os"
-    "os/exec"
-    "path/filepath"
-    "testing"
-)
-
-func blackvaultBin(t *testing.T) string {
-    t.Helper()
-    if bin := os.Getenv("BLACKVAULT_BIN"); bin != "" {
-        return bin
-    }
-    return "./bin/blackvault"
-}
-
-func TestBlackvault_OpenAndStatus(t *testing.T) {
-    t.Parallel()
-
-    tmp := t.TempDir()
-    bin := blackvaultBin(t)
-
-    // ตัวอย่าง: ทดสอบ open (อาจต้อง mock/ใช้ repo ทดสอบ)
-    openCmd := exec.Command(bin, "open", "group/repo", "--workspace", tmp)
-    openCmd.Stdout = &bytes.Buffer{}
-    openCmd.Stderr = &bytes.Buffer{}
-    if err := openCmd.Run(); err != nil {
-        t.Fatalf("open failed: %v", err)
-    }
-
-    // ทดสอบ status
-    var out bytes.Buffer
-    statusCmd := exec.Command(bin, "status", "--workspace", tmp)
-    statusCmd.Stdout = &out
-    statusCmd.Stderr = &bytes.Buffer{}
-    if err := statusCmd.Run(); err != nil {
-        t.Fatalf("status failed: %v", err)
-    }
-
-    if !bytes.Contains(out.Bytes(), []byte("group/repo")) {
-        t.Fatalf("expected status to contain group/repo, got: %s", out.String())
-    }
-}
-```
-
-> หมายเหตุ: flag เช่น `--workspace` เป็นตัวอย่าง สมมติว่ามี option ให้ชี้โฟลเดอร์ workspace เอง ถ้าในโค้ดจริงใช้ path อื่น ให้ปรับตามจริง
-
-3. **รัน integration tests:**
+ดู coverage แบบฟังก์ชันต่อฟังก์ชันจากไฟล์ profile:
 
 ```bash
-BLACKVAULT_BIN=./bin/blackvault go test ./integration -v
+go test -coverprofile=coverage.out -covermode=atomic ./cmd ./test
+go tool cover -func coverage.out
 ```
 
-สรุป: ใช้ `go test ./...` สำหรับ unit tests ในแพ็กเกจทั้งหมด และใช้โฟลเดอร์ `integration/` + binary ที่ build ไว้สำหรับ integration tests ที่รัน CLI จริง
+ไฟล์ `coverage.out` และ `coverage.html` ถูกใส่ใน `.gitignore` จะไม่ถูก commit
 
 ## Generate gRPC (สำหรับ serve + GUI)
 
